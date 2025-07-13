@@ -1,0 +1,9 @@
+{  
+  "name": "smart-package-box",  
+  "version": "1.0.0",  
+  "description": "Smart package box project",  
+  "main": "src/index.js",  
+  "scripts": {  
+    "start": "node src/index.js"  
+  }  
+}  

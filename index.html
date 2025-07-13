@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Kotak Paket IoT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-app-compat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.2/firebase-database-compat.min.js"></script>
+  <style>
+    body {
+      background-color: #eaf2fc;
+      background-image: url('logo-polsri.png');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 30%;
+      background-attachment: fixed;
+    }
+
+    .glass-bg {
+      background-color: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(20px);
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-bg::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+      transform: rotate(45deg);
+      transition: transform 0.6s;
+      opacity: 0;
+    }
+
+    .glass-bg:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+      background-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .glass-bg:hover::before {
+      transform: rotate(45deg) translate(50%, 50%);
+      opacity: 1;
+    }
+
+    .status-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: all 0.3s ease;
+    }
+
+    .status-connected {
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.5);
+    }
+
+    .status-disconnected {
+      background: linear-gradient(135deg, #f87171, #ef4444);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+    }
+
+    .btn-effect {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-effect::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: left 0.5s;
+    }
+
+    .btn-effect:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-effect:hover::before {
+      left: 100%;
+    }
+
+    .btn-effect:active {
+      transform: translateY(-1px) scale(0.98);
+      transition: transform 0.1s ease-in-out;
+    }
+
+    /* Dynamic button colors based on state */
+    .btn-locked {
+      background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    }
+
+    .btn-unlocked {
+      background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    }
+
+    #loader {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(234, 242, 252, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .spinner {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3b82f6;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #4ade80;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .toast-error {
+      background-color: #ef4444;
+    }
+
+    .pulse-dot {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Chart toggle buttons */
+    .chart-toggle-btn {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #3b82f6;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .chart-toggle-btn:hover {
+      background: rgba(59, 130, 246, 0.2);
+    }
+
+    .chart-toggle-btn.active {
+      background: #3b82f6;
+      color: white;
+    }
+  </style>
+</head>
+<body class="text-gray-800">
+  <!-- Loader -->
+  <div id="loader"><div class="spinner"></div></div>
+
+  <!-- LOGO HEADER -->
+  <div id="logoHeader" class="fixed top-4 left-4 z-50 flex items-center gap-2 bg-white bg-opacity-70 px-3 py-1 rounded-xl shadow-lg transition-opacity duration-500">
+    <img src="logo-polsri.png" alt="Logo" class="w-8 h-8" />
+    <span class="font-bold text-blue-900">SmartBox IoT</span>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastSuccess" class="toast">🔔 Berhasil Terhubung Firebase</div>
+  <div id="toastError" class="toast toast-error">❌ Koneksi Gagal</div>
+
+  <!-- Navbar Hamburger -->
+  <div class="fixed top-4 right-4 z-50">
+    <button onclick="toggleMenu()" class="p-2 rounded-full bg-white shadow-md focus:outline-none">
+      <svg class="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2"
+        viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+    </button>
+    <div id="dropdownMenu" class="hidden mt-2 bg-white text-sm text-gray-800 rounded-lg shadow-lg w-52">
+      <a href="#home" class="block px-4 py-2 hover:bg-gray-100">🏠 Home</a>
+      <a href="#status" class="block px-4 py-2 hover:bg-gray-100">📡 Status</a>
+      <a href="#kontrol" class="block px-4 py-2 hover:bg-gray-100">⚙️ Kontrol</a>
+      <a href="#grafik" class="block px-4 py-2 hover:bg-gray-100">📈 Grafik Aktivitas</a>
+      <a href="#log" class="block px-4 py-2 hover:bg-gray-100">📝 Log Historis</a>
+      <div class="border-t border-gray-200 my-1"></div>
+      <button onclick="toggleSensorChart()" class="w-full text-left px-4 py-2 hover:bg-gray-100 focus:outline-none">
+        📊 <span id="chartToggleText">Grafik Sensor PIR/Getar</span>
+      </button>
+      <div class="border-t border-gray-200 my-1"></div>
+      <span class="block px-4 pt-2 pb-1 text-xs text-gray-500">📷 V380 Pro App</span>
+      <a href="https://play.google.com/store/apps/details?id=com.macrovideo.v380" target="_blank" class="block px-4 py-2 hover:bg-gray-100">📱 Android</a>
+      <a href="https://apps.apple.com/us/app/v380/id989049956" target="_blank" class="block px-4 py-2 hover:bg-gray-100">🍎 iOS</a>
+      <a href="https://v380.org/v380-for-pc/" target="_blank" class="block px-4 py-2 hover:bg-gray-100">💻 Windows</a>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto p-6 space-y-6">
+    <h1 class="text-3xl font-bold text-center text-blue-900" id="home">
+      📦 Kotak Penerima Paket Berbasis IoT
+    </h1>
+
+    <!-- Connection Status Section -->
+    <div class="text-center space-y-3">
+      <div>
+        <span id="connectionStatus" class="status-box status-disconnected">
+          <div class="w-3 h-3 bg-red-500 rounded-full pulse-dot"></div>
+          Status: Menghubungkan Firebase...
+        </span>
+      </div>
+      <div>
+        <span id="esp32Status" class="status-box status-disconnected">
+          <div class="w-3 h-3 bg-red-500 rounded-full pulse-dot"></div>
+          ESP32: Menghubungkan...
+        </span>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="glass-bg p-4" id="status">
+        <h2 class="text-xl font-semibold text-blue-700 mb-4">📡 Status Realtime</h2>
+        <ul class="space-y-2 text-sm md:text-base">
+          <li><strong>Kotak Paket:</strong> <span id="paketStatus">Memuat...</span></li>
+          <li><strong>Kotak COD:</strong> <span id="codStatus">Memuat...</span></li>
+          <li><strong>Sensor PIR:</strong> <span id="pirStatus">Memuat...</span></li>
+          <li><strong>Sensor Getar:</strong> <span id="swStatus">Memuat...</span></li>
+          <li><strong>Total Paket Masuk:</strong> <span id="totalPaket">0</span></li>
+          <li><strong>Update Terakhir:</strong> <span id="lastUpdate">-</span></li>
+        </ul>
+      </div>
+
+      <div class="glass-bg p-4" id="kontrol">
+        <h2 class="text-xl font-semibold text-blue-700 mb-4">⚙️ Kontrol</h2>
+        <div class="grid grid-cols-2 gap-4 text-white text-sm md:text-base">
+          <button id="btnPaket" onclick="kontrolPaket()" class="btn-effect btn-locked py-3 rounded-xl font-semibold">
+            🔒 <span id="textPaket">Buka Paket</span>
+          </button>
+          <button id="btnCod" onclick="kontrolCod()" class="btn-effect btn-locked py-3 rounded-xl font-semibold">
+            💼 <span id="textCod">Buka COD</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-bg p-4" id="grafik">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-blue-700">📈 Aktivitas Kotak 24 Jam</h2>
+        <div class="text-sm text-gray-600">
+          <span id="nextReset">Reset otomatis: --:--</span>
+        </div>
+      </div>
+      <div class="mb-3 text-sm text-gray-600">
+        <span>📊 Total aktivitas hari ini: <strong id="todayActivity">0</strong> | 🕐 Periode: <span id="currentPeriod">--</span></span>
+      </div>
+      <div class="w-full h-80">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Enhanced Sensor Chart with Time Controls -->
+    <div class="glass-bg p-4 hidden" id="sensorChart">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-blue-700">📊 Aktivitas Sensor PIR & Getar</h2>
+        <div class="flex gap-2 items-center">
+          <div class="flex gap-1">
+            <button onclick="setSensorTimeRange('24h')" id="btn24h" class="chart-toggle-btn active">24 Jam</button>
+            <button onclick="setSensorTimeRange('1h')" id="btn1h" class="chart-toggle-btn">1 Jam</button>
+            <button onclick="setSensorTimeRange('10m')" id="btn10m" class="chart-toggle-btn">10 Menit</button>
+          </div>
+          <button onclick="toggleSensorChart()" class="text-sm bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg">
+            ✖️ Tutup
+          </button>
+        </div>
+      </div>
+      <div class="mb-3 text-sm text-gray-600">
+        <span id="sensorChartDesc">🔍 Monitoring sensor aktivitas 24 jam terakhir</span>
+      </div>
+      <div class="w-full h-80">
+        <canvas id="sensorLineChart"></canvas>
+      </div>
+    </div>
+
+    <div class="glass-bg p-4 overflow-auto" id="log">
+      <h2 class="text-xl font-semibold text-blue-700 mb-4">📝 Log Historis Sensor (Firebase)</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left bg-blue-100">
+              <th class="px-3 py-2">Waktu</th>
+              <th class="px-3 py-2">Sensor PIR</th>
+              <th class="px-3 py-2">Sensor Getar</th>
+              <th class="px-3 py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody id="logBody" class="divide-y divide-gray-200">
+            <tr>
+              <td colspan="4" class="px-3 py-4 text-center text-gray-500">📡 Memuat data dari Firebase...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer class="text-center text-xs text-gray-500 pt-8">
+      &copy; 2025 - IoT Smart Box | Dashboard by M.Nawval Alfazri | Powered by Firebase
+    </footer>
+  </div>
+
+  <script>
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyCGqkuKVjFNf7-zyQhoCHUgZtWJmMh0ces",
+      authDomain: "smart-package-box-bfdbc.firebaseapp.com",
+      databaseURL: "https://smart-package-box-bfdbc-default-rtdb.asia-southeast1.firebasedatabase.app/",
+      projectId: "smart-package-box-bfdbc",
+      storageBucket: "smart-package-box-bfdbc.firebasedatabase.app",
+      messagingSenderId: "82575104868",
+      appId: "1:82575104868:web:8380a0126685438e287871"
+    };
+
+    // ESP32 Configuration
+    const ESP32_IP = '192.168.100.60';
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Global variables
+    let chart;
+    let sensorChart;
+    let chartData = [];
+    let logs = [];
+    let isFirebaseConnected = false;
+    let isESP32Connected = false;
+    let hourlyActivity = new Array(24).fill(0);
+    let currentResetTime = null;
+    let resetTimer = null;
+    let showingSensorChart = false;
+    let sensorTimeRange = '24h'; // Default to 24 hours
+    let currentStatus = {
+      paket: false,
+      cod: false
+    };
+
+    // Initialize Dashboard
+    function initializeDashboard() {
+      document.getElementById("loader").style.display = "none";
+      initializeChart();
+      initializeSensorChart();
+      setupFirebaseListeners();
+      setupScrollEffects();
+      initializeHourlySystem();
+      checkESP32Connection();
+      console.log("📱 Dashboard initialized successfully!");
+    }
+
+    // Check ESP32 Connection
+    async function checkESP32Connection() {
+      try {
+        const response = await fetch(`http://${ESP32_IP}/cek_status`, {
+          method: 'GET',
+          mode: 'cors',
+          timeout: 5000
+        });
+        
+        if (response.ok) {
+          isESP32Connected = true;
+          updateESP32Status(true);
+          const data = await response.json();
+          updateStatusDisplay(data);
+        } else {
+          throw new Error('ESP32 not responding');
+        }
+      } catch (error) {
+        isESP32Connected = false;
+        updateESP32Status(false);
+        console.error('ESP32 connection failed:', error);
+      }
+      
+      // Check every 10 seconds
+      setTimeout(checkESP32Connection, 10000);
+    }
+
+    // Update ESP32 Status Display
+    function updateESP32Status(connected) {
+      const statusElement = document.getElementById('esp32Status');
+      if (connected) {
+        statusElement.innerHTML = `
+          <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+          ESP32: Terhubung
+        `;
+        statusElement.className = 'status-box status-connected';
+      } else {
+        statusElement.innerHTML = `
+          <div class="w-3 h-3 bg-red-500 rounded-full pulse-dot"></div>
+          ESP32: Terputus
+        `;
+        statusElement.className = 'status-box status-disconnected';
+      }
+    }
+
+    // Dynamic Control Functions
+    function kontrolPaket() {
+      const command = currentStatus.paket ? 'tutup_paket' : 'buka_paket';
+      kontrol(command);
+    }
+
+    function kontrolCod() {
+      const command = currentStatus.cod ? 'tutup_cod' : 'buka_cod';
+      kontrol(command);
+    }
+
+    // Update Button States
+    function updateButtonStates() {
+      const btnPaket = document.getElementById('btnPaket');
+      const textPaket = document.getElementById('textPaket');
+      const btnCod = document.getElementById('btnCod');
+      const textCod = document.getElementById('textCod');
+
+      // Update Paket Button
+      if (currentStatus.paket) {
+        btnPaket.className = 'btn-effect btn-unlocked py-3 rounded-xl font-semibold';
+        textPaket.textContent = 'Tutup Paket';
+        btnPaket.innerHTML = '🔓 ' + textPaket.outerHTML;
+      } else {
+        btnPaket.className = 'btn-effect btn-locked py-3 rounded-xl font-semibold';
+        textPaket.textContent = 'Buka Paket';
+        btnPaket.innerHTML = '🔒 ' + textPaket.outerHTML;
+      }
+
+      // Update COD Button
+      if (currentStatus.cod) {
+        btnCod.className = 'btn-effect btn-unlocked py-3 rounded-xl font-semibold';
+        textCod.textContent = 'Tutup COD';
+        btnCod.innerHTML = '💰 ' + textCod.outerHTML;
+      } else {
+        btnCod.className = 'btn-effect btn-locked py-3 rounded-xl font-semibold';
+        textCod.textContent = 'Buka COD';
+        btnCod.innerHTML = '💼 ' + textCod.outerHTML;
+      }
+    }
+
+    // Set Sensor Time Range
+    function setSensorTimeRange(range) {
+      sensorTimeRange = range;
+      
+      // Update button states
+      document.querySelectorAll('.chart-toggle-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.getElementById(`btn${range}`).classList.add('active');
+      
+      // Update chart description
+      const desc = document.getElementById('sensorChartDesc');
+      switch(range) {
+        case '24h':
+          desc.textContent = '🔍 Monitoring sensor aktivitas 24 jam terakhir';
+          break;
+        case '1h':
+          desc.textContent = '🔍 Monitoring sensor aktivitas 1 jam terakhir (per 5 menit)';
+          break;
+        case '10m':
+          desc.textContent = '🔍 Monitoring sensor aktivitas 10 menit terakhir (per menit)';
+          break;
+      }
+      
+      // Update sensor chart
+      if (showingSensorChart) {
+        updateSensorChart();
+      }
+    }
+
+    // Initialize Sensor Chart
+    function initializeSensorChart() {
+      const ctx = document.getElementById('sensorLineChart').getContext('2d');
+      sensorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: '👁️ Sensor PIR',
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              data: [],
+              fill: true,
+              tension: 0.4,
+              pointRadius: 5,
+              pointHoverRadius: 8
+            },
+            {
+              label: '📳 Sensor Getar',
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              data: [],
+              fill: true,
+              tension: 0.4,
+              pointRadius: 5,
+              pointHoverRadius: 8
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.5,
+          layout: {
+            padding: {
+              top: 10,
+              bottom: 10,
+              left: 10,
+              right: 10
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1.2,
+              ticks: {
+                stepSize: 1,
+                callback: function(value) {
+                  return value === 1 ? 'Aktif' : value === 0 ? 'Tidak Aktif' : '';
+                },
+                font: {
+                  size: 11
+                }
+              },
+              grid: {
+                color: 'rgba(156, 163, 175, 0.2)'
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                maxTicksLimit: sensorTimeRange === '10m' ? 10 : (sensorTimeRange === '1h' ? 12 : 24),
+                font: {
+                  size: 10
+                }
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                font: {
+                  size: 11
+                },
+                padding: 15
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const sensor = context.dataset.label;
+                  const status = context.raw === 1 ? 'Aktif' : 'Tidak Aktif';
+                  return `${sensor}: ${status}`;
+                }
+              },
+              titleFont: {
+                size: 12
+              },
+              bodyFont: {
+                size: 11
+              }
+            }
+          },
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          },
+          elements: {
+            point: {
+              backgroundColor: function(context) {
+                return context.raw === 1 ? '#ef4444' : '#22c55e';
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Toggle Sensor Chart
+    function toggleSensorChart() {
+      const chartElement = document.getElementById('sensorChart');
+      const toggleText = document.getElementById('chartToggleText');
+      const dropdownMenu = document.getElementById('dropdownMenu');
+      
+      if (showingSensorChart) {
+        chartElement.classList.add('hidden');
+        toggleText.textContent = 'Grafik Sensor PIR/Getar';
+        showingSensorChart = false;
+        console.log("📊 Sensor chart hidden");
+      } else {
+        chartElement.classList.remove('hidden');
+        toggleText.textContent = 'Sembunyikan Grafik Sensor';
+        showingSensorChart = true;
+        
+        updateSensorChart();
+        
+        setTimeout(() => {
+          chartElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }, 100);
+        
+        console.log("📊 Sensor chart shown");
+      }
+      
+      dropdownMenu.classList.add('hidden');
+    }
+
+    // Update Sensor Chart with time range support
+    function updateSensorChart() {
+      if (!sensorChart || logs.length === 0) return;
+
+      let processedData = [];
+      const now = new Date();
+      
+      if (sensorTimeRange === '24h') {
+        // Group by hours for 24h view
+        const hourlyData = new Array(24).fill().map((_, hour) => ({
+          time: `${hour.toString().padStart(2, '0')}:00`,
+          pir: 0,
+          sw: 0,
+          count: 0
+        }));
+        
+        logs.forEach(log => {
+          if (log.timestamp) {
+            const logDate = new Date(log.timestamp);
+            const hoursDiff = Math.floor((now - logDate) / (1000 * 60 * 60));
+            if (hoursDiff >= 0 && hoursDiff < 24) {
+              const hour = logDate.getHours();
+              hourlyData[hour].pir += log.pir ? 1 : 0;
+              hourlyData[hour].sw += log.sw ? 1 : 0;
+              hourlyData[hour].count++;
+            }
+          }
+        });
+        
+        processedData = hourlyData.map(data => ({
+          time: data.time,
+          pir: data.count > 0 ? (data.pir > 0 ? 1 : 0) : 0,
+          sw: data.count > 0 ? (data.sw > 0 ? 1 : 0) : 0
+        }));
+        
+      } else if (sensorTimeRange === '1h') {
+        // Group by 5-minute intervals for 1h view
+        const intervalData = new Array(12).fill().map((_, interval) => {
+          const minutes = interval * 5;
+          return {
+            time: `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`,
+            pir: 0,
+            sw: 0,
+            count: 0
+          };
+        });
+        
+        logs.forEach(log => {
+          if (log.timestamp) {
+            const logDate = new Date(log.timestamp);
+            const minutesDiff = Math.floor((now - logDate) / (1000 * 60));
+            if (minutesDiff >= 0 && minutesDiff < 60) {
+              const interval = Math.floor(minutesDiff / 5);
+              if (interval < 12) {
+                intervalData[11 - interval].pir += log.pir ? 1 : 0;
+                intervalData[11 - interval].sw += log.sw ? 1 : 0;
+                intervalData[11 - interval].count++;
+              }
+            }
+          }
+        });
+        
+        processedData = intervalData.map(data => ({
+          time: data.time,
+          pir: data.count > 0 ? (data.pir > 0 ? 1 : 0) : 0,
+          sw: data.count > 0 ? (data.sw > 0 ? 1 : 0) : 0
+        }));
+        
+      } else if (sensorTimeRange === '10m') {
+        // Show per minute for 10m view
+        const minuteData = new Array(10).fill().map((_, minute) => ({
+          time: `${minute + 1}m`,
+          pir: 0,
+          sw: 0,
+          count: 0
+        }));
+        
+        logs.forEach(log => {
+          if (log.timestamp) {
+            const logDate = new Date(log.timestamp);
+            const minutesDiff = Math.floor((now - logDate) / (1000 * 60));
+            if (minutesDiff >= 0 && minutesDiff < 10) {
+              const minute = 9 - minutesDiff;
+              minuteData[minute].pir += log.pir ? 1 : 0;
+              minuteData[minute].sw += log.sw ? 1 : 0;
+              minuteData[minute].count++;
+            }
+          }
+        });
+        
+        processedData = minuteData.map(data => ({
+          time: data.time,
+          pir: data.count > 0 ? (data.pir > 0 ? 1 : 0) : 0,
+          sw: data.count > 0 ? (data.sw > 0 ? 1 : 0) : 0
+        }));
+      }
+
+      sensorChart.data.labels = processedData.map(data => data.time);
+      sensorChart.data.datasets[0].data = processedData.map(data => data.pir);
+      sensorChart.data.datasets[1].data = processedData.map(data => data.sw);
+      sensorChart.update('none');
+      
+      console.log(`📊 Sensor chart updated for ${sensorTimeRange} with`, processedData.length, "data points");
+    }
+
+    // Update Chart
+    function updateChart() {
+      if (!chart) return;
+      chart.data.datasets[0].data = [...hourlyActivity];
+      chart.update('none');
+    }
+
+    // Setup Firebase Real-time Listeners
+    function setupFirebaseListeners() {
+      database.ref('.info/connected').on('value', (snapshot) => {
+        isFirebaseConnected = snapshot.val();
+        updateConnectionStatus(isFirebaseConnected);
+      });
+
+      database.ref('status').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          updateStatusDisplay(data);
+          processActivityData(data);
+          // Removed automatic toast notification
+        }
+      });
+
+      database.ref('logs').limitToLast(50).on('value', (snapshot) => {
+        const logsData = snapshot.val();
+        if (logsData) {
+          logs = Object.entries(logsData).map(([key, value]) => ({
+            id: key,
+            ...value
+          }));
+          updateLogTable();
+          
+          if (showingSensorChart) {
+            updateSensorChart();
+          }
+        }
+      });
+    }
+
+    // Update Connection Status
+    function updateConnectionStatus(connected) {
+      const statusElement = document.getElementById('connectionStatus');
+      if (connected) {
+        statusElement.innerHTML = `
+          <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+          Status: Firebase Terhubung
+        `;
+        statusElement.className = 'status-box status-connected';
+      } else {
+        statusElement.innerHTML = `
+          <div class="w-3 h-3 bg-red-500 rounded-full pulse-dot"></div>
+          Status: Firebase Terputus
+        `;
+        statusElement.className = 'status-box status-disconnected';
+        // Removed automatic error toast
+      }
+    }
+
+    // Update Status Display
+    function updateStatusDisplay(data) {
+      // Update current status for button states
+      currentStatus.paket = data.paket;
+      currentStatus.cod = data.cod;
+      
+      const updateElement = (id, value, trueText, falseText, trueClass, falseClass) => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.textContent = value ? trueText : falseText;
+          element.className = value ? trueClass : falseClass;
+        }
+      };
+
+      updateElement('paketStatus', data.paket, '🔓 Terbuka', '🔒 Tertutup', 'text-green-600 font-semibold', 'text-red-600 font-semibold');
+      updateElement('codStatus', data.cod, '💰 Terbuka', '💼 Tertutup', 'text-green-600 font-semibold', 'text-red-600 font-semibold');
+      updateElement('pirStatus', data.pir === 1, '👁️ Gerakan Terdeteksi', '😴 Tidak Ada', 'text-yellow-600 font-semibold', 'text-gray-500');
+      updateElement('swStatus', data.sw === 1, '📳 Getaran Terdeteksi', '🔇 Tidak Ada', 'text-yellow-600 font-semibold', 'text-gray-500');
+
+      document.getElementById('totalPaket').textContent = data.jumlah_paket || 0;
+      document.getElementById('lastUpdate').textContent = data.timestamp || new Date().toLocaleString('id-ID');
+      
+      // Update button states
+      updateButtonStates();
+    }
+
+    // Update Log Table
+    function updateLogTable() {
+      const logBody = document.getElementById('logBody');
+      if (logs.length === 0) {
+        logBody.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-500">📭 Belum ada data log</td></tr>';
+        return;
+      }
+
+      logBody.innerHTML = logs.reverse().slice(0, 15).map(log => `
+        <tr class="hover:bg-blue-50">
+          <td class="px-3 py-2">${log.time}</td>
+          <td class="px-3 py-2">
+            <span class="px-2 py-1 rounded-full text-xs ${log.pir ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}">
+              ${log.pir ? '👁️ Aktif' : '😴 Tidak'}
+            </span>
+          </td>
+          <td class="px-3 py-2">
+            <span class="px-2 py-1 rounded-full text-xs ${log.sw ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}">
+              ${log.sw ? '📳 Aktif' : '🔇 Tidak'}
+            </span>
+          </td>
+          <td class="px-3 py-2">
+            <span class="px-2 py-1 rounded-full text-xs ${log.pir || log.sw ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+              ${log.pir || log.sw ? '⚠️ Aktivitas' : '✅ Normal'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Initialize Chart
+    function initializeChart() {
+      const ctx = document.getElementById('statusChart').getContext('2d');
+      const hours = Array.from({length: 24}, (_, i) => {
+        const hour = i.toString().padStart(2, '0');
+        return `${hour}:00`;
+      });
+
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: hours,
+          datasets: [
+            {
+              label: '📊 Aktivitas Kotak per Jam',
+              data: hourlyActivity,
+              backgroundColor: (ctx) => {
+                const value = ctx.parsed.y;
+                if (value === 0) return 'rgba(156, 163, 175, 0.3)';
+                if (value <= 2) return 'rgba(34, 197, 94, 0.7)';
+                if (value <= 5) return 'rgba(251, 191, 36, 0.7)';
+                return 'rgba(239, 68, 68, 0.7)';
+              },
+              borderColor: (ctx) => {
+                const value = ctx.parsed.y;
+                if (value === 0) return 'rgba(156, 163, 175, 0.8)';
+                if (value <= 2) return 'rgba(34, 197, 94, 1)';
+                if (value <= 5) return 'rgba(251, 191, 36, 1)';
+                return 'rgba(239, 68, 68, 1)';
+              },
+              borderWidth: 2,
+              borderRadius: 4,
+              borderSkipped: false,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 2.5,
+          layout: {
+            padding: {
+              top: 10,
+              bottom: 10,
+              left: 10,
+              right: 10
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: Math.max(10, Math.max(...hourlyActivity) + 2),
+              ticks: {
+                stepSize: 1,
+                callback: function(value) {
+                  return value + ' aktivitas';
+                },
+                font: {
+                  size: 11
+                }
+              },
+              grid: {
+                color: 'rgba(156, 163, 175, 0.2)'
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                maxRotation: 0,
+                minRotation: 0,
+                font: {
+                  size: 10
+                }
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                font: {
+                  size: 11
+                },
+                padding: 15
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const hour = context.label;
+                  const count = context.raw;
+                  return `${hour}: ${count} aktivitas kotak`;
+                }
+              },
+              titleFont: {
+                size: 12
+              },
+              bodyFont: {
+                size: 11
+              }
+            }
+          },
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          },
+          elements: {
+            bar: {
+              borderRadius: 3
+            }
+          }
+        }
+      });
+    }
+
+    // Initialize 24-Hour System
+    function initializeHourlySystem() {
+      setNextResetTime();
+      loadTodayActivity();
+      startResetTimer();
+      updateActivityDisplay();
+      console.log("⏰ 24-hour system initialized");
+    }
+
+    // Set Next Reset Time
+    function setNextResetTime() {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      currentResetTime = tomorrow;
+      updateResetCountdown();
+    }
+
+    // Load Today's Activity from Firebase
+    function loadTodayActivity() {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+      
+      database.ref(`daily_activity/${todayKey}`).once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.hourly) {
+          hourlyActivity = data.hourly;
+          updateChart();
+          updateActivityDisplay();
+        }
+      });
+    }
+
+    // Save Today's Activity to Firebase
+    function saveTodayActivity() {
+      const today = new Date();
+      const todayKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+      
+      const dailyData = {
+        date: todayKey,
+        hourly: hourlyActivity,
+        total: hourlyActivity.reduce((a, b) => a + b, 0),
+        lastUpdate: new Date().toISOString()
+      };
+      
+      database.ref(`daily_activity/${todayKey}`).set(dailyData);
+    }
+
+    // Process Activity Data
+    function processActivityData(data) {
+      if (data.paket !== undefined || data.cod !== undefined) {
+        const currentHour = new Date().getHours();
+        hourlyActivity[currentHour]++;
+        
+        saveTodayActivity();
+        updateChart();
+        updateActivityDisplay();
+        
+        console.log(`📊 Aktivitas kotak tercatat pada jam ${currentHour}:00`);
+      }
+    }
+
+    // Start Reset Timer
+    function startResetTimer() {
+      if (resetTimer) clearInterval(resetTimer);
+      
+      resetTimer = setInterval(() => {
+        const now = new Date();
+        updateResetCountdown();
+        
+        if (now >= currentResetTime) {
+          resetDailyActivity();
+        }
+      }, 1000);
+    }
+
+    // Reset Daily Activity
+    function resetDailyActivity() {
+      console.log("🔄 Resetting daily activity data...");
+      hourlyActivity = new Array(24).fill(0);
+      setNextResetTime();
+      updateChart();
+      updateActivityDisplay();
+      // Removed automatic toast notification
+      console.log("✅ Daily activity reset completed");
+    }
+
+    // Update Reset Countdown
+    function updateResetCountdown() {
+      const now = new Date();
+      const diff = currentResetTime - now;
+      
+      if (diff > 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        document.getElementById('nextReset').textContent = `Reset otomatis: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      }
+    }
+
+    // Update Activity Display
+    function updateActivityDisplay() {
+      const total = hourlyActivity.reduce((a, b) => a + b, 0);
+      const now = new Date();
+      const currentHour = now.getHours();
+      
+      document.getElementById('todayActivity').textContent = total;
+      document.getElementById('currentPeriod').textContent = `${now.toLocaleDateString('id-ID')} | Jam ${currentHour}:00`;
+    }
+
+    // Control ESP32
+    async function kontrol(endpoint) {
+      try {
+        const response = await fetch(`http://${ESP32_IP}/${endpoint}`, {
+          method: 'GET',
+          mode: 'cors'
+        });
+
+        if (response.ok) {
+          console.log(`✅ Perintah ${endpoint} berhasil dikirim`);
+          
+          const now = new Date();
+          const logData = {
+            time: now.toLocaleTimeString('id-ID'),
+            pir: 0,
+            sw: 0,
+            action: endpoint,
+            timestamp: now.toISOString()
+          };
+          
+          database.ref('logs').push(logData);
+        } else {
+          console.error(`❌ Gagal mengirim perintah ${endpoint}`);
+          showToast('toastError');
+        }
+      } catch (error) {
+        console.error('🚨 Error kontrol ESP32:', error);
+        showToast('toastError');
+      }
+    }
+
+    // Show Toast Notification
+    function showToast(toastId) {
+      const toast = document.getElementById(toastId);
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    // Toggle Menu
+    function toggleMenu() {
+      document.getElementById('dropdownMenu').classList.toggle('hidden');
+    }
+
+    // Setup Scroll Effects
+    function setupScrollEffects() {
+      let lastScrollTop = 0;
+      const logo = document.getElementById("logoHeader");
+      
+      window.addEventListener("scroll", function () {
+        let currentScroll = window.scrollY || document.documentElement.scrollTop;
+        if (currentScroll > lastScrollTop && currentScroll > 20) {
+          logo.style.opacity = "0.3";
+        } else {
+          logo.style.opacity = "1";
+        }
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+      });
+    }
+
+    // Window Load Event
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        initializeDashboard();
+      }, 1500);
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      const menu = document.getElementById('dropdownMenu');
+      const button = e.target.closest('button[onclick="toggleMenu()"]');
+      if (!button && !menu.contains(e.target)) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    // Error handling for unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('🚨 Unhandled promise rejection:', event.reason);
+    });
+  </script>
+</body>
+</html>
