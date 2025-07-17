@@ -10,7 +10,7 @@
 #include <HTTPClient.h>
 
 // WiFi & Credentials
-const char* ssid = "YOUR_WIFI_SSID";  // ← GANTI dengan WiFi Anda
+const char* ssid = "YOUR_WIFI_SSID";  
 const char* password = "YOUR_WIFI_PASSWORD";
 
 // Telegram
@@ -19,7 +19,7 @@ const char* password = "YOUR_WIFI_PASSWORD";
 
 // Firebase Configuration
 const char* FIREBASE_HOST = "smart-package-box-bfdbc-default-rtdb.asia-southeast1.firebasedatabase.app";
-const char* FIREBASE_AUTH = "AIzaSyCGqkuKVjFNf7-zyQhoCHUgZtWJmMh0ces"; // Use your API key
+const char* FIREBASE_AUTH = "AIzaSyCGqkuKVjFNf7-zyQhoCHUgZtWJmMh0ces"; 
 
 WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
