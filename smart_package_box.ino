@@ -1,4 +1,4 @@
-#include <WiFi.h>
+#include <WiFi.h> //Library yang di pakai
 #include <WiFiClientSecure.h>
 #include <WebServer.h>
 #include <UniversalTelegramBot.h>
@@ -10,16 +10,16 @@
 #include <HTTPClient.h>
 
 // WiFi & Credentials
-const char* ssid = "YOUR_WIFI_SSID";  
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "-";  // GANTI dengan WiFi Anda
+const char* password = "-"; // GANTI Password WiFi anda
 
 // Telegram
-#define BOTtoken "8039590983:AAGQU8YEdKN6I8T_IlzbGuUJYVI150E6-dY"
-#define CHAT_ID "7984670497"
+#define BOTtoken "-" //Masukan Token dari BotFather
+#define CHAT_ID "-"              // Chat_ID_token
 
 // Firebase Configuration
 const char* FIREBASE_HOST = "smart-package-box-bfdbc-default-rtdb.asia-southeast1.firebasedatabase.app";
-const char* FIREBASE_AUTH = "AIzaSyCGqkuKVjFNf7-zyQhoCHUgZtWJmMh0ces"; 
+const char* FIREBASE_AUTH = "AIzaSyCGqkuKVjFNf7-zyQhoCHUgZtWJmMh0ces"; // Use your API key
 
 WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
@@ -338,7 +338,7 @@ void setup() {
   Serial.println("⏰ Time configured (WIB UTC+7)");
 
   // LCD & Hardware
-  Wire.begin(21, 22);
+  Wire.begin(21, 22); //Pin Lcd di ESP 32
   lcd.init(); 
   lcd.backlight(); 
   showDefaultLCD();
