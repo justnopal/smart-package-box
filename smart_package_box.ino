@@ -10,12 +10,12 @@
 #include <HTTPClient.h>
 
 // WiFi & Credentials
-const char* ssid = "-";  // GANTI dengan WiFi Anda
-const char* password = "-"; // GANTI Password WiFi anda
+const char* ssid = "Naktaubae";  // GANTI dengan WiFi Anda
+const char* password = "Gilang.alf123"; // GANTI Password WiFi anda
 
 // Telegram
-#define BOTtoken "-" //Masukan Token dari BotFather
-#define CHAT_ID "-"              // Chat_ID_token
+#define BOTtoken "8039590983:AAGQU8YEdKN6I8T_IlzbGuUJYVI150E6-dY" //Masukan Token dari BotFather
+#define CHAT_ID "7984670497"              // Chat_ID_token
 
 // Firebase Configuration
 const char* FIREBASE_HOST = "smart-package-box-bfdbc-default-rtdb.asia-southeast1.firebasedatabase.app";
