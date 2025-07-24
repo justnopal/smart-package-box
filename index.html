@@ -361,7 +361,7 @@
     };
 
     // ESP32 Configuration
-    const ESP32_IP = '192.168.100.60';
+    // const ESP32_IP = '192.168.100.60'; // Tidak lagi digunakan untuk kontrol langsung
 
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
@@ -373,7 +373,7 @@
     let chartData = [];
     let logs = [];
     let isFirebaseConnected = false;
-    let isESP32Connected = false;
+    let isESP32Connected = false; // Status ESP32 akan diambil dari Firebase
     let hourlyActivity = new Array(24).fill(0);
     let currentResetTime = null;
     let resetTimer = null;
@@ -392,38 +392,14 @@
       setupFirebaseListeners();
       setupScrollEffects();
       initializeHourlySystem();
-      checkESP32Connection();
+      // checkESP32Connection(); // Tidak lagi perlu polling langsung ke IP ESP32
       console.log("📱 Dashboard initialized successfully!");
     }
 
-    // Check ESP32 Connection
-    async function checkESP32Connection() {
-      try {
-        const response = await fetch(`http://${ESP32_IP}/cek_status`, {
-          method: 'GET',
-          mode: 'cors',
-          timeout: 5000
-        });
-        
-        if (response.ok) {
-          isESP32Connected = true;
-          updateESP32Status(true);
-          const data = await response.json();
-          updateStatusDisplay(data);
-        } else {
-          throw new Error('ESP32 not responding');
-        }
-      } catch (error) {
-        isESP32Connected = false;
-        updateESP32Status(false);
-        console.error('ESP32 connection failed:', error);
-      }
-      
-      // Check every 10 seconds
-      setTimeout(checkESP32Connection, 10000);
-    }
+    // checkESP32Connection() function is removed as direct IP polling is no longer used.
+    // ESP32 status will be derived from Firebase 'esp32_online' flag.
 
-    // Update ESP32 Status Display
+    // Update ESP32 Status Display (modified to use Firebase 'esp32_online' flag)
     function updateESP32Status(connected) {
       const statusElement = document.getElementById('esp32Status');
       if (connected) {
@@ -780,7 +756,8 @@
         if (data) {
           updateStatusDisplay(data);
           processActivityData(data);
-          // Removed automatic toast notification
+          // Update ESP32 online status from Firebase
+          updateESP32Status(data.esp32_online || false);
         }
       });
 
@@ -815,7 +792,6 @@
           Status: Firebase Terputus
         `;
         statusElement.className = 'status-box status-disconnected';
-        // Removed automatic error toast
       }
     }
 
@@ -1045,15 +1021,19 @@
 
     // Process Activity Data
     function processActivityData(data) {
+      // Hanya tambahkan aktivitas jika ada perubahan status paket/COD
+      // atau jika ada log aksi yang relevan
       if (data.paket !== undefined || data.cod !== undefined) {
         const currentHour = new Date().getHours();
-        hourlyActivity[currentHour]++;
-        
-        saveTodayActivity();
-        updateChart();
-        updateActivityDisplay();
-        
-        console.log(`📊 Aktivitas kotak tercatat pada jam ${currentHour}:00`);
+        // Cek apakah ada perubahan status yang signifikan untuk dicatat sebagai "aktivitas"
+        // Ini bisa disesuaikan lebih lanjut jika Anda punya definisi "aktivitas" yang lebih spesifik
+        if (data.paket !== currentStatus.paket || data.cod !== currentStatus.cod) {
+            hourlyActivity[currentHour]++;
+            saveTodayActivity();
+            updateChart();
+            updateActivityDisplay();
+            console.log(`📊 Aktivitas kotak tercatat pada jam ${currentHour}:00`);
+        }
       }
     }
 
@@ -1078,7 +1058,6 @@
       setNextResetTime();
       updateChart();
       updateActivityDisplay();
-      // Removed automatic toast notification
       console.log("✅ Daily activity reset completed");
     }
 
@@ -1104,34 +1083,27 @@
       document.getElementById('currentPeriod').textContent = `${now.toLocaleDateString('id-ID')} | Jam ${currentHour}:00`;
     }
 
-    // Control ESP32
-    async function kontrol(endpoint) {
+    // Control ESP32 (MODIFIED TO USE FIREBASE)
+    async function kontrol(command) {
       try {
-        const response = await fetch(`http://${ESP32_IP}/${endpoint}`, {
-          method: 'GET',
-          mode: 'cors'
-        });
+        // Dapatkan timestamp saat ini dari Firebase Server (penting agar ESP32 tahu ini perintah baru)
+        const timestamp = firebase.database.ServerValue.TIMESTAMP;
+        
+        // Buat objek perintah
+        const commandData = {};
+        commandData[command] = timestamp; // Misalnya: { "buka_paket": timestamp }
 
-        if (response.ok) {
-          console.log(`✅ Perintah ${endpoint} berhasil dikirim`);
-          
-          const now = new Date();
-          const logData = {
-            time: now.toLocaleTimeString('id-ID'),
-            pir: 0,
-            sw: 0,
-            action: endpoint,
-            timestamp: now.toISOString()
-          };
-          
-          database.ref('logs').push(logData);
-        } else {
-          console.error(`❌ Gagal mengirim perintah ${endpoint}`);
-          showToast('toastError');
-        }
+        // Tulis perintah ke Firebase di path /commands
+        await database.ref('commands').set(commandData);
+        console.log(`✅ Perintah '${command}' berhasil dikirim ke Firebase.`);
+        showToast('toastSuccess'); // Tampilkan notifikasi sukses
+        
+        // Tidak perlu lagi fetch langsung ke IP ESP32
+        // const response = await fetch(`http://${ESP32_IP}/${endpoint}`, { ... });
+        // ...
       } catch (error) {
-        console.error('🚨 Error kontrol ESP32:', error);
-        showToast('toastError');
+        console.error('🚨 Error mengirim perintah ke Firebase:', error);
+        showToast('toastError'); // Tampilkan notifikasi error
       }
     }
 
